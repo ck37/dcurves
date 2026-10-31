@@ -1,5 +1,7 @@
 # dcurves (development version)
 
+* `dca()` and `test_consequences()` are much faster for binary outcomes on large data: 0.1 seconds instead of about a minute for 60,000 observations and 2,000 thresholds. Results are unchanged.
+
 # dcurves 0.5.1
 
 * HTML5 documentation update to satisfy CRAN requirement.

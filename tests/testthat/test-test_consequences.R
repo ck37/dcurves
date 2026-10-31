@@ -43,3 +43,17 @@ test_that("test_consequences() works", {
          lr_neg  = (1 - (a / (a + c))) / (d / (b + d)))
   )
 })
+
+test_that("test_consequences() matches a direct count at every threshold", {
+  # include thresholds equal to observed risks, to check the `>=` boundary
+  risk <- df_binary$cancerpredmarker
+  case <- df_binary$cancer == 1
+  thresholds <- sort(unique(c(0, 1, seq(0, 1, by = 0.01), risk[1:50])))
+
+  df <- test_consequences(cancer ~ cancerpredmarker, data = df_binary,
+                          thresholds = thresholds,
+                          statistics = c("test_pos_rate", "tp_rate", "fp_rate"))
+  expect_equal(df$test_pos_rate, sapply(thresholds, function(t) mean(risk >= t)))
+  expect_equal(df$tp_rate, sapply(thresholds, function(t) mean(risk >= t & case)))
+  expect_equal(df$fp_rate, sapply(thresholds, function(t) mean(risk >= t & !case)))
+})

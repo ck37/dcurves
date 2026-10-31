@@ -239,23 +239,20 @@ test_consequences_data_frame <- function(model_frame, outcome_name, outcome_type
   }
 
   if (outcome_type == "binary") {
-    df <-
-      df %>%
-      dplyr::rowwise() %>%
-      dplyr::mutate(
-        test_pos_rate =
-          .convert_to_binary_fct(risk >= .data$threshold) %>%
-          table() %>%
-          purrr::pluck(2) %>% {
-            . / .data$n
-          },
-        tp_rate =
-          mean(risk[outcome == "TRUE"] >= .data$threshold) * .data$pos_rate %>%
-          unname(),
-        fp_rate =
-          mean(risk[outcome == "FALSE"] >= .data$threshold) * (1 - .data$pos_rate) %>%
-          unname(),
-      )
+    # count the risks at or above each threshold from the sorted risks, which
+    # is much faster on large data than checking every risk at every threshold
+    risk_cases <- risk[outcome == "TRUE"]
+    risk_controls <- risk[outcome == "FALSE"]
+    # missing risks are possible here only with options(na.action = "na.pass"):
+    # they are counted as test negative in test_pos_rate, tp_rate is NA if any
+    # case has a missing risk, and fp_rate is NA if any control has one
+    df$test_pos_rate <- .n_at_or_above(risk[!is.na(risk)], thresholds) / df$n
+    df$tp_rate <-
+      .n_at_or_above(risk_cases, thresholds) / length(risk_cases) *
+      unname(df$pos_rate)
+    df$fp_rate <-
+      .n_at_or_above(risk_controls, thresholds) / length(risk_controls) *
+      (1 - unname(df$pos_rate))
   }
   else if (outcome_type == "survival") {
     df <-
@@ -292,6 +289,24 @@ test_consequences_data_frame <- function(model_frame, outcome_name, outcome_type
     )))
 }
 
+
+#' Count values at or above each threshold
+#'
+#' `findInterval(left.open = TRUE)` gives the number of sorted values strictly
+#' below each threshold; the rest are at or above it. Returns NA for every
+#' threshold if `x` has a missing value.
+#'
+#' @param x numeric vector
+#' @param thresholds threshold probs vector
+#'
+#' @noRd
+#' @keywords internal
+.n_at_or_above <- function(x, thresholds) {
+  if (anyNA(x)) {
+    return(rep(NA_integer_, length(thresholds)))
+  }
+  length(x) - findInterval(thresholds, sort(x), left.open = TRUE)
+}
 
 #' Convert binary outcome to factor
 #'
